@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSL 交換申請</title>
+<style>
+  :root { --accent:#2b5fa8; --bg:#f6f7f9; --border:#d8dce1; --text:#1d2430; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Noto Sans TC", "PingFang TC", Arial, sans-serif;
+         background: var(--bg); color: var(--text); margin:0; padding: 24px 16px 60px; }
+  .card { max-width: 560px; margin: 0 auto; background: #fff; border: 1px solid var(--border);
+          border-radius: 10px; padding: 28px 24px; }
+  h1 { font-size: 1.4rem; margin: 0 0 6px; }
+  p.desc { color:#5a6472; margin: 0 0 22px; font-size: .92rem; }
+  .field { margin-bottom: 16px; }
+  label { display:block; font-size:.88rem; font-weight:600; margin-bottom:6px; }
+  input, select, textarea { width:100%; padding:9px 10px; border:1px solid var(--border);
+          border-radius:6px; font-size:.95rem; font-family:inherit; }
+  textarea { min-height: 70px; resize: vertical; }
+  .radio-group label, .checkbox-group label { font-weight:400; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  button { width:100%; padding:12px; background: var(--accent); color:#fff; border:none;
+           border-radius:8px; font-size:1rem; cursor:pointer; margin-top: 8px; }
+  button:disabled { opacity:.6; cursor:not-allowed; }
+  .msg { margin-top: 14px; padding: 10px 12px; border-radius:6px; font-size:.9rem; }
+  .msg.ok { background:#e6f4ea; color:#256029; }
+  .msg.err { background:#fdecea; color:#a33a2f; }
+  .required { color:#c0392b; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="form-title">載入中…</h1>
+    <p class="desc" id="form-desc"></p>
+    <form id="qsl-form"></form>
+    <div id="msg"></div>
+  </div>
+
+<script>
+// ⚠️ 部署後請把這裡換成你自己的 Worker 網址
+const API_BASE = "https://qsl-worker.你的帳號.workers.dev";
+
+let currentSchema = null;
+
+async function loadSchema() {
+  const res = await fetch(`${API_BASE}/api/qsl/schema`);
+  const schema = await res.json();
+  currentSchema = schema;
+  document.getElementById("form-title").textContent = schema.title || "QSL 交換申請";
+  document.getElementById("form-desc").textContent = schema.description || "";
+  renderForm(schema);
+}
+
+function renderForm(schema) {
+  const form = document.getElementById("qsl-form");
+  form.innerHTML = "";
+
+  schema.fields.forEach(field => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "field";
+    wrapper.dataset.fieldId = field.id;
+
+    const label = document.createElement("label");
+    label.textContent = field.label;
+    if (field.required) {
+      const star = document.createElement("span");
+      star.className = "required";
+      star.textContent = " *";
+      label.appendChild(star);
+    }
+    wrapper.appendChild(label);
+
+    let input;
+    if (field.type === "select") {
+      input = document.createElement("select");
+      const blank = document.createElement("option");
+      blank.value = ""; blank.textContent = "請選擇…";
+      input.appendChild(blank);
+      (field.options || []).forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt; o.textContent = opt;
+        input.appendChild(o);
+      });
+    } else if (field.type === "radio") {
+      input = document.createElement("div");
+      input.className = "radio-group";
+      (field.options || []).forEach((opt, i) => {
+        const id = `${field.id}_${i}`;
+        const l = document.createElement("label");
+        const r = document.createElement("input");
+        r.type = "radio"; r.name = field.id; r.value = opt; r.id = id;
+        if (field.required) r.required = true;
+        l.appendChild(r);
+        l.appendChild(document.createTextNode(opt));
+        input.appendChild(l);
+      });
+    } else if (field.type === "textarea") {
+      input = document.createElement("textarea");
+    } else {
+      input = document.createElement("input");
+      input.type = field.type === "email" ? "email" : (field.type || "text");
+      if (field.placeholder) input.placeholder = field.placeholder;
+    }
+
+    if (input.tagName !== "DIV") {
+      input.name = field.id;
+      if (field.required) input.required = true;
+    }
+    wrapper.appendChild(input);
+    form.appendChild(wrapper);
+
+    if (field.showIf) {
+      wrapper.style.display = "none";
+    }
+  });
+
+  // showIf 連動顯示邏輯
+  schema.fields.forEach(field => {
+    if (!field.showIf) return;
+    const controllerName = field.showIf.field;
+    const controllerEls = form.querySelectorAll(`[name="${controllerName}"]`);
+    const targetWrapper = form.querySelector(`[data-field-id="${field.id}"]`);
+    const update = () => {
+      let value = "";
+      const first = controllerEls[0];
+      if (first && first.type === "radio") {
+        const checked = form.querySelector(`[name="${controllerName}"]:checked`);
+        value = checked ? checked.value : "";
+      } else if (first) {
+        value = first.value;
+      }
+      targetWrapper.style.display = (value === field.showIf.equals) ? "" : "none";
+    };
+    controllerEls.forEach(el => el.addEventListener("change", update));
+    update();
+  });
+
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "submit";
+  submitBtn.textContent = "送出申請";
+  form.appendChild(submitBtn);
+
+  form.addEventListener("submit", onSubmit);
+}
+
+async function onSubmit(e) {
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector("button");
+  const msgEl = document.getElementById("msg");
+  msgEl.textContent = ""; msgEl.className = "msg";
+
+  const data = {};
+  currentSchema.fields.forEach(field => {
+    if (field.type === "radio") {
+      const checked = form.querySelector(`[name="${field.id}"]:checked`);
+      data[field.id] = checked ? checked.value : "";
+    } else {
+      const el = form.querySelector(`[name="${field.id}"]`);
+      data[field.id] = el ? el.value : "";
+    }
+  });
+
+  btn.disabled = true;
+  btn.textContent = "送出中…";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/qsl/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "送出失敗");
+
+    msgEl.textContent = result.message || "申請已送出!";
+    msgEl.classList.add("ok");
+    form.reset();
+    renderForm(currentSchema); // 重新渲染以重置 showIf 狀態
+  } catch (err) {
+    msgEl.textContent = err.message;
+    msgEl.classList.add("err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "送出申請";
+  }
+}
+
+loadSchema().catch(() => {
+  document.getElementById("form-title").textContent = "載入表單失敗";
+  document.getElementById("form-desc").textContent = "請確認 API_BASE 網址設定是否正確,或稍後再試。";
+});
+</script>
+</body>
+</html>
