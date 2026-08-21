@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSL 後台管理</title>
+<style>
+  :root { --accent:#2b5fa8; --bg:#f6f7f9; --border:#d8dce1; --text:#1d2430; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Noto Sans TC", "PingFang TC", Arial, sans-serif;
+         background: var(--bg); color: var(--text); margin:0; padding: 20px 16px 60px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+  h1 { font-size:1.3rem; margin:0 0 16px; }
+  h2 { font-size:1.05rem; margin: 0 0 14px; }
+  input, select, textarea { padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:.92rem; font-family:inherit; }
+  button { padding:8px 14px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:.9rem; }
+  button.secondary { background:#eef1f4; color:var(--text); }
+  button.danger { background:#c0392b; }
+  table { width:100%; border-collapse: collapse; font-size:.88rem; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--border); vertical-align: top; }
+  th { color:#5a6472; font-weight:600; }
+  .tabs { display:flex; gap:8px; margin-bottom:18px; }
+  .tabs button { background:#eef1f4; color:var(--text); }
+  .tabs button.active { background:var(--accent); color:#fff; }
+  .tabpanel { display:none; }
+  .tabpanel.active { display:block; }
+  .field-row { border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px; }
+  .field-row .grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px; }
+  .field-row .grid label { font-size:.78rem; color:#5a6472; display:block; margin-bottom:3px; }
+  .field-row .grid input, .field-row .grid select { width:100%; }
+  .row-actions { display:flex; gap:8px; margin-top:6px; }
+  .status-badge { padding:2px 8px; border-radius:10px; font-size:.78rem; }
+  .status-pending { background:#fff3cd; color:#856404; }
+  .status-confirmed { background:#d1ecf1; color:#0c5460; }
+  .status-sent { background:#d4edda; color:#155724; }
+  .status-rejected { background:#f8d7da; color:#721c24; }
+  #login-panel { max-width: 360px; margin: 60px auto; }
+  .hint { color:#5a6472; font-size:.8rem; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div id="login-panel" class="card">
+  <h1>QSL 後台登入</h1>
+  <div class="field">
+    <input type="password" id="password" placeholder="請輸入管理密碼" style="width:100%; margin-bottom:10px;">
+    <button onclick="login()" style="width:100%;">登入</button>
+  </div>
+  <div id="login-msg" class="hint"></div>
+</div>
+
+<div class="wrap" id="admin-panel" style="display:none;">
+  <div class="tabs">
+    <button id="tab-requests" class="active" onclick="switchTab('requests')">申請紀錄</button>
+    <button id="tab-schema" onclick="switchTab('schema')">表單設計</button>
+    <button class="secondary" onclick="logout()" style="margin-left:auto;">登出</button>
+  </div>
+
+  <div id="panel-requests" class="tabpanel active">
+    <div class="card">
+      <h2>申請紀錄</h2>
+      <div style="margin-bottom:10px;">
+        篩選狀態:
+        <select id="status-filter" onchange="loadRequests()">
+          <option value="">全部</option>
+          <option value="pending">待處理</option>
+          <option value="confirmed">已確認</option>
+          <option value="sent">已寄出</option>
+          <option value="rejected">已拒絕</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="requests-table">
+          <thead>
+            <tr>
+              <th>#</th><th>呼號</th><th>日期/時間</th><th>頻率/模式</th>
+              <th>回卡方式</th><th>Email</th><th>狀態</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="requests-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-schema" class="tabpanel">
+    <div class="card">
+      <h2>表單欄位設計</h2>
+      <p class="hint">在這裡新增、修改、刪除、排序表單欄位,儲存後前台表單會立即更新。</p>
+      <div class="field-row" style="background:#f6f7f9;">
+        <label>表單標題</label>
+        <input id="schema-title" style="width:100%; margin-bottom:8px;">
+        <label>表單說明</label>
+        <textarea id="schema-desc" style="width:100%;"></textarea>
+      </div>
+      <div id="fields-list"></div>
+      <button class="secondary" onclick="addField()">+ 新增欄位</button>
+      <div style="margin-top:16px;">
+        <button onclick="saveSchema()">儲存表單設計</button>
+        <span id="schema-msg" class="hint"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ⚠️ 部署後請把這裡換成你自己的 Worker 網址
+const API_BASE = "https://qsl-worker.你的帳號.workers.dev";
+
+let token = sessionStorage.getItem("qsl_admin_token") || "";
+let schemaData = { title: "", description: "", fields: [] };
+
+if (token) showAdmin();
+
+async function login() {
+  const password = document.getElementById("password").value;
+  const msg = document.getElementById("login-msg");
+  msg.textContent = "登入中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "登入失敗");
+    token = data.token;
+    sessionStorage.setItem("qsl_admin_token", token);
+    showAdmin();
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem("qsl_admin_token");
+  token = "";
+  document.getElementById("admin-panel").style.display = "none";
+  document.getElementById("login-panel").style.display = "block";
+}
+
+function showAdmin() {
+  document.getElementById("login-panel").style.display = "none";
+  document.getElementById("admin-panel").style.display = "block";
+  loadRequests();
+  loadSchema();
+}
+
+function authHeaders() {
+  return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+}
+
+function switchTab(name) {
+  document.getElementById("tab-requests").classList.toggle("active", name === "requests");
+  document.getElementById("tab-schema").classList.toggle("active", name === "schema");
+  document.getElementById("panel-requests").classList.toggle("active", name === "requests");
+  document.getElementById("panel-schema").classList.toggle("active", name === "schema");
+}
+
+// ── 申請紀錄 ──────────────────────────────────
+async function loadRequests() {
+  const status = document.getElementById("status-filter").value;
+  const url = `${API_BASE}/api/admin/requests${status ? `?status=${status}` : ""}`;
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) return logout();
+  const data = await res.json();
+  const tbody = document.getElementById("requests-tbody");
+  tbody.innerHTML = "";
+  (data.requests || []).forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.id}</td>
+      <td><strong>${r.callsign}</strong></td>
+      <td>${r.qso_date} ${r.qso_time || ""}</td>
+      <td>${r.frequency || "-"} / ${r.mode || "-"}</td>
+      <td>${r.qsl_via || "-"}</td>
+      <td>${r.email}</td>
+      <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
+      <td>
+        <select onchange="updateStatus(${r.id}, this.value)">
+          ${["pending","confirmed","sent","rejected"].map(s =>
+            `<option value="${s}" ${s === r.status ? "selected" : ""}>${statusLabel(s)}</option>`
+          ).join("")}
+        </select>
+        <button class="danger" onclick="deleteRequest(${r.id})">刪除</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function statusLabel(s) {
+  return { pending: "待處理", confirmed: "已確認", sent: "已寄出", rejected: "已拒絕" }[s] || s;
+}
+
+async function updateStatus(id, status) {
+  await fetch(`${API_BASE}/api/admin/requests/${id}`, {
+    method: "PATCH", headers: authHeaders(), body: JSON.stringify({ status }),
+  });
+  loadRequests();
+}
+
+async function deleteRequest(id) {
+  if (!confirm("確定要刪除這筆申請紀錄嗎?")) return;
+  await fetch(`${API_BASE}/api/admin/requests/${id}`, { method: "DELETE", headers: authHeaders() });
+  loadRequests();
+}
+
+// ── 表單設計 ──────────────────────────────────
+async function loadSchema() {
+  const res = await fetch(`${API_BASE}/api/admin/schema`, { headers: authHeaders() });
+  if (res.status === 401) return logout();
+  schemaData = await res.json();
+  document.getElementById("schema-title").value = schemaData.title || "";
+  document.getElementById("schema-desc").value = schemaData.description || "";
+  renderFieldsEditor();
+}
+
+function renderFieldsEditor() {
+  const list = document.getElementById("fields-list");
+  list.innerHTML = "";
+  schemaData.fields.forEach((field, idx) => {
+    const row = document.createElement("div");
+    row.className = "field-row";
+    row.innerHTML = `
+      <div class="grid">
+        <div><label>欄位 ID(英文,唯一)</label><input data-k="id" value="${field.id || ""}"></div>
+        <div><label>顯示標籤</label><input data-k="label" value="${field.label || ""}"></div>
+        <div><label>類型</label>
+          <select data-k="type">
+            ${["text","email","date","textarea","select","radio"].map(t =>
+              `<option value="${t}" ${field.type === t ? "selected" : ""}>${t}</option>`
+            ).join("")}
+          </select>
+        </div>
+        <div><label>是否必填</label>
+          <select data-k="required">
+            <option value="true" ${field.required ? "selected" : ""}>必填</option>
+            <option value="false" ${!field.required ? "selected" : ""}>選填</option>
+          </select>
+        </div>
+        <div style="grid-column:1/3;"><label>選項(僅 select/radio 用,以逗號分隔)</label>
+          <input data-k="options" value="${(field.options || []).join(",")}"></div>
+        <div><label>Placeholder(選填提示文字)</label><input data-k="placeholder" value="${field.placeholder || ""}"></div>
+      </div>
+      <div class="row-actions">
+        <button class="secondary" onclick="moveField(${idx}, -1)">↑ 上移</button>
+        <button class="secondary" onclick="moveField(${idx}, 1)">↓ 下移</button>
+        <button class="danger" onclick="removeField(${idx})">刪除欄位</button>
+      </div>
+    `;
+    row.querySelectorAll("[data-k]").forEach(input => {
+      input.addEventListener("change", () => syncFieldFromRow(idx, row));
+    });
+    list.appendChild(row);
+  });
+}
+
+function syncFieldFromRow(idx, row) {
+  const get = k => row.querySelector(`[data-k="${k}"]`).value;
+  schemaData.fields[idx] = {
+    ...schemaData.fields[idx],
+    id: get("id").trim(),
+    label: get("label").trim(),
+    type: get("type"),
+    required: get("required") === "true",
+    placeholder: get("placeholder").trim(),
+    options: get("options").split(",").map(s => s.trim()).filter(Boolean),
+  };
+}
+
+function addField() {
+  schemaData.fields.push({ id: `field_${Date.now()}`, label: "新欄位", type: "text", required: false });
+  renderFieldsEditor();
+}
+
+function removeField(idx) {
+  schemaData.fields.splice(idx, 1);
+  renderFieldsEditor();
+}
+
+function moveField(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= schemaData.fields.length) return;
+  [schemaData.fields[idx], schemaData.fields[newIdx]] = [schemaData.fields[newIdx], schemaData.fields[idx]];
+  renderFieldsEditor();
+}
+
+async function saveSchema() {
+  schemaData.title = document.getElementById("schema-title").value;
+  schemaData.description = document.getElementById("schema-desc").value;
+  const msg = document.getElementById("schema-msg");
+  msg.textContent = "儲存中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/schema`, {
+      method: "POST", headers: authHeaders(), body: JSON.stringify(schemaData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "儲存失敗");
+    msg.textContent = "已儲存 ✓";
+    setTimeout(() => (msg.textContent = ""), 2000);
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+}
+</script>
+</body>
+</html>
