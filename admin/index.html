@@ -20,7 +20,7 @@
   table { width:100%; border-collapse: collapse; font-size:.88rem; }
   th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--border); vertical-align: top; }
   th { color:#5a6472; font-weight:600; }
-  .tabs { display:flex; gap:8px; margin-bottom:18px; }
+  .tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
   .tabs button { background:#eef1f4; color:var(--text); }
   .tabs button.active { background:var(--accent); color:#fff; }
   .tabpanel { display:none; }
@@ -49,6 +49,8 @@
   .detail-row .v { white-space:pre-wrap; word-break:break-word; }
   .modal-close-row { text-align:right; margin-top:14px; }
   td a.link-btn { color:var(--accent); cursor:pointer; text-decoration:underline; font-size:.85rem; margin-right:8px; }
+  .lang-pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.72rem;
+    background:#eef1f4; color:#5a6472; margin-left:6px; }
 </style>
 </head>
 <body>
@@ -65,7 +67,8 @@
 <div class="wrap" id="admin-panel" style="display:none;">
   <div class="tabs">
     <button id="tab-requests" class="active" onclick="switchTab('requests')">申請紀錄</button>
-    <button id="tab-schema" onclick="switchTab('schema')">表單設計</button>
+    <button id="tab-schema-zh" onclick="switchTab('schema-zh')">中文表單設計</button>
+    <button id="tab-schema-en" onclick="switchTab('schema-en')">English Form Design</button>
     <button class="secondary" onclick="logout()" style="margin-left:auto;">登出</button>
   </div>
 
@@ -87,7 +90,7 @@
           <thead>
             <tr>
               <th>#</th><th>呼號</th><th>日期/時間</th><th>頻率/模式</th>
-              <th>回卡方式</th><th>Email</th><th>狀態</th><th>操作</th>
+              <th>回卡方式</th><th>Email</th><th>語言</th><th>狀態</th><th>操作</th>
             </tr>
           </thead>
           <tbody id="requests-tbody"></tbody>
@@ -96,21 +99,42 @@
     </div>
   </div>
 
-  <div id="panel-schema" class="tabpanel">
+  <!-- 中文表單設計 -->
+  <div id="panel-schema-zh" class="tabpanel">
     <div class="card">
-      <h2>表單欄位設計</h2>
-      <p class="hint">在這裡新增、修改、刪除、排序表單欄位,儲存後前台表單會立即更新。</p>
+      <h2>中文表單欄位設計 <span class="lang-pill">zh</span></h2>
+      <p class="hint">這裡編輯的是「中文版」表單。儲存後,使用者切換到中文時看到的就是這份設計。</p>
       <div class="field-row" style="background:#f6f7f9;">
         <label>表單標題</label>
-        <input id="schema-title" style="width:100%; margin-bottom:8px;">
+        <input id="schema-title-zh" style="width:100%; margin-bottom:8px;">
         <label>表單說明</label>
-        <textarea id="schema-desc" style="width:100%;"></textarea>
+        <textarea id="schema-desc-zh" style="width:100%;"></textarea>
       </div>
-      <div id="fields-list"></div>
-      <button class="secondary" onclick="addField()">+ 新增欄位</button>
+      <div id="fields-list-zh"></div>
+      <button class="secondary" onclick="addField('zh')">+ 新增欄位</button>
       <div style="margin-top:16px;">
-        <button onclick="saveSchema()">儲存表單設計</button>
-        <span id="schema-msg" class="hint"></span>
+        <button onclick="saveSchema('zh')">儲存中文表單設計</button>
+        <span id="schema-msg-zh" class="hint"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- English Form Design -->
+  <div id="panel-schema-en" class="tabpanel">
+    <div class="card">
+      <h2>English Form Design <span class="lang-pill">en</span></h2>
+      <p class="hint">This edits the "English" version of the form. Users who switch to English will see this design.</p>
+      <div class="field-row" style="background:#f6f7f9;">
+        <label>Form Title</label>
+        <input id="schema-title-en" style="width:100%; margin-bottom:8px;">
+        <label>Form Description</label>
+        <textarea id="schema-desc-en" style="width:100%;"></textarea>
+      </div>
+      <div id="fields-list-en"></div>
+      <button class="secondary" onclick="addField('en')">+ Add Field</button>
+      <div style="margin-top:16px;">
+        <button onclick="saveSchema('en')">Save English Form</button>
+        <span id="schema-msg-en" class="hint"></span>
       </div>
     </div>
   </div>
@@ -131,7 +155,12 @@
 const API_BASE = "https://qsl-worker.bugjang3.workers.dev";
 
 let token = sessionStorage.getItem("qsl_admin_token") || "";
-let schemaData = { title: "", description: "", fields: [] };
+
+// 兩個語言各自獨立一份 schema 資料,互不影響
+let schemaData = {
+  zh: { title: "", description: "", fields: [] },
+  en: { title: "", description: "", fields: [] },
+};
 
 if (token) showAdmin();
 
@@ -166,7 +195,8 @@ function showAdmin() {
   document.getElementById("login-panel").style.display = "none";
   document.getElementById("admin-panel").style.display = "block";
   loadRequests();
-  loadSchema();
+  loadSchema("zh");
+  loadSchema("en");
 }
 
 function authHeaders() {
@@ -174,10 +204,11 @@ function authHeaders() {
 }
 
 function switchTab(name) {
-  document.getElementById("tab-requests").classList.toggle("active", name === "requests");
-  document.getElementById("tab-schema").classList.toggle("active", name === "schema");
-  document.getElementById("panel-requests").classList.toggle("active", name === "requests");
-  document.getElementById("panel-schema").classList.toggle("active", name === "schema");
+  const names = ["requests", "schema-zh", "schema-en"];
+  names.forEach(n => {
+    document.getElementById(`tab-${n}`).classList.toggle("active", n === name);
+    document.getElementById(`panel-${n}`).classList.toggle("active", n === name);
+  });
 }
 
 // ── 申請紀錄 ──────────────────────────────────
@@ -198,6 +229,7 @@ async function loadRequests() {
       <td>${r.frequency || "-"} / ${r.mode || "-"}</td>
       <td>${r.qsl_via || "-"}</td>
       <td>${r.email}</td>
+      <td>${(r.lang || "zh").toUpperCase()}</td>
       <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
       <td>
         <a class="link-btn" onclick='showDetail(${JSON.stringify(r).replace(/'/g, "&#39;")})'>查看詳情</a><br>
@@ -217,12 +249,14 @@ const FIELD_LABELS = {
   qso_time: "通聯時間", frequency: "頻率", band: "頻段", mode: "模式",
   rst_sent: "發出RST", rst_received: "收到RST", qsl_via: "回卡方式",
   address: "郵寄地址", email: "Email", note: "備註", status: "狀態",
-  created_at: "送出時間", updated_at: "最後更新", id: "編號", ip: "IP",
+  created_at: "送出時間", updated_at: "最後更新", id: "編號", ip: "IP", lang: "語言",
 };
 
-function fieldLabel(key) {
-  // 優先用目前 schema 裡設定的標籤(若後台改過欄位名稱),否則用內建對照表
-  const match = schemaData.fields && schemaData.fields.find(f => f.id === key);
+function fieldLabel(key, r) {
+  // 優先用該筆申請當初送出時所用語言的 schema 標籤,否則用內建對照表
+  const lang = (r && r.lang) === "en" ? "en" : "zh";
+  const fields = schemaData[lang] && schemaData[lang].fields;
+  const match = fields && fields.find(f => f.id === key);
   return (match && match.label) || FIELD_LABELS[key] || key;
 }
 
@@ -238,7 +272,7 @@ function showDetail(r) {
     if (key === "status") value = statusLabel(value);
     const row = document.createElement("div");
     row.className = "detail-row";
-    row.innerHTML = `<div class="k">${fieldLabel(key)}</div><div class="v"></div>`;
+    row.innerHTML = `<div class="k">${fieldLabel(key, r)}</div><div class="v"></div>`;
     row.querySelector(".v").textContent = value; // 用 textContent 避免 XSS
     body.appendChild(row);
   });
@@ -250,7 +284,7 @@ function showDetail(r) {
     Object.keys(extra).forEach(key => {
       const row = document.createElement("div");
       row.className = "detail-row";
-      row.innerHTML = `<div class="k">${fieldLabel(key)}</div><div class="v"></div>`;
+      row.innerHTML = `<div class="k">${fieldLabel(key, r)}</div><div class="v"></div>`;
       row.querySelector(".v").textContent = extra[key] || "-";
       body.appendChild(row);
     });
@@ -280,60 +314,68 @@ async function deleteRequest(id) {
   loadRequests();
 }
 
-// ── 表單設計 ──────────────────────────────────
-async function loadSchema() {
-  const res = await fetch(`${API_BASE}/api/admin/schema`, { headers: authHeaders() });
+// ── 表單設計(依語言分開存取) ──────────────────
+async function loadSchema(lang) {
+  const res = await fetch(`${API_BASE}/api/admin/schema?lang=${lang}`, { headers: authHeaders() });
   if (res.status === 401) return logout();
-  schemaData = await res.json();
-  document.getElementById("schema-title").value = schemaData.title || "";
-  document.getElementById("schema-desc").value = schemaData.description || "";
-  renderFieldsEditor();
+  schemaData[lang] = await res.json();
+  document.getElementById(`schema-title-${lang}`).value = schemaData[lang].title || "";
+  document.getElementById(`schema-desc-${lang}`).value = schemaData[lang].description || "";
+  renderFieldsEditor(lang);
 }
 
-function renderFieldsEditor() {
-  const list = document.getElementById("fields-list");
+function renderFieldsEditor(lang) {
+  const list = document.getElementById(`fields-list-${lang}`);
   list.innerHTML = "";
-  schemaData.fields.forEach((field, idx) => {
+  const labelText = lang === "en"
+    ? { id: "Field ID (unique)", label: "Display Label", type: "Type", required: "Required",
+        req: "Required", opt: "Optional", options: "Options (comma-separated, for select/radio)",
+        placeholder: "Placeholder text", up: "↑ Up", down: "↓ Down", del: "Delete" }
+    : { id: "欄位 ID(英文,唯一)", label: "顯示標籤", type: "類型", required: "是否必填",
+        req: "必填", opt: "選填", options: "選項(僅 select/radio 用,以逗號分隔)",
+        placeholder: "Placeholder(選填提示文字)", up: "↑ 上移", down: "↓ 下移", del: "刪除欄位" };
+
+  schemaData[lang].fields.forEach((field, idx) => {
     const row = document.createElement("div");
     row.className = "field-row";
     row.innerHTML = `
       <div class="grid">
-        <div><label>欄位 ID(英文,唯一)</label><input data-k="id" value="${field.id || ""}"></div>
-        <div><label>顯示標籤</label><input data-k="label" value="${field.label || ""}"></div>
-        <div><label>類型</label>
+        <div><label>${labelText.id}</label><input data-k="id" value="${field.id || ""}"></div>
+        <div><label>${labelText.label}</label><input data-k="label" value="${field.label || ""}"></div>
+        <div><label>${labelText.type}</label>
           <select data-k="type">
             ${["text","email","date","textarea","select","radio"].map(t =>
               `<option value="${t}" ${field.type === t ? "selected" : ""}>${t}</option>`
             ).join("")}
           </select>
         </div>
-        <div><label>是否必填</label>
+        <div><label>${labelText.required}</label>
           <select data-k="required">
-            <option value="true" ${field.required ? "selected" : ""}>必填</option>
-            <option value="false" ${!field.required ? "selected" : ""}>選填</option>
+            <option value="true" ${field.required ? "selected" : ""}>${labelText.req}</option>
+            <option value="false" ${!field.required ? "selected" : ""}>${labelText.opt}</option>
           </select>
         </div>
-        <div style="grid-column:1/3;"><label>選項(僅 select/radio 用,以逗號分隔)</label>
+        <div style="grid-column:1/3;"><label>${labelText.options}</label>
           <input data-k="options" value="${(field.options || []).join(",")}"></div>
-        <div><label>Placeholder(選填提示文字)</label><input data-k="placeholder" value="${field.placeholder || ""}"></div>
+        <div><label>${labelText.placeholder}</label><input data-k="placeholder" value="${field.placeholder || ""}"></div>
       </div>
       <div class="row-actions">
-        <button class="secondary" onclick="moveField(${idx}, -1)">↑ 上移</button>
-        <button class="secondary" onclick="moveField(${idx}, 1)">↓ 下移</button>
-        <button class="danger" onclick="removeField(${idx})">刪除欄位</button>
+        <button class="secondary" onclick="moveField('${lang}', ${idx}, -1)">${labelText.up}</button>
+        <button class="secondary" onclick="moveField('${lang}', ${idx}, 1)">${labelText.down}</button>
+        <button class="danger" onclick="removeField('${lang}', ${idx})">${labelText.del}</button>
       </div>
     `;
     row.querySelectorAll("[data-k]").forEach(input => {
-      input.addEventListener("change", () => syncFieldFromRow(idx, row));
+      input.addEventListener("change", () => syncFieldFromRow(lang, idx, row));
     });
     list.appendChild(row);
   });
 }
 
-function syncFieldFromRow(idx, row) {
+function syncFieldFromRow(lang, idx, row) {
   const get = k => row.querySelector(`[data-k="${k}"]`).value;
-  schemaData.fields[idx] = {
-    ...schemaData.fields[idx],
+  schemaData[lang].fields[idx] = {
+    ...schemaData[lang].fields[idx],
     id: get("id").trim(),
     label: get("label").trim(),
     type: get("type"),
@@ -343,35 +385,37 @@ function syncFieldFromRow(idx, row) {
   };
 }
 
-function addField() {
-  schemaData.fields.push({ id: `field_${Date.now()}`, label: "新欄位", type: "text", required: false });
-  renderFieldsEditor();
+function addField(lang) {
+  const defaultLabel = lang === "en" ? "New Field" : "新欄位";
+  schemaData[lang].fields.push({ id: `field_${Date.now()}`, label: defaultLabel, type: "text", required: false });
+  renderFieldsEditor(lang);
 }
 
-function removeField(idx) {
-  schemaData.fields.splice(idx, 1);
-  renderFieldsEditor();
+function removeField(lang, idx) {
+  schemaData[lang].fields.splice(idx, 1);
+  renderFieldsEditor(lang);
 }
 
-function moveField(idx, dir) {
+function moveField(lang, idx, dir) {
+  const arr = schemaData[lang].fields;
   const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= schemaData.fields.length) return;
-  [schemaData.fields[idx], schemaData.fields[newIdx]] = [schemaData.fields[newIdx], schemaData.fields[idx]];
-  renderFieldsEditor();
+  if (newIdx < 0 || newIdx >= arr.length) return;
+  [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+  renderFieldsEditor(lang);
 }
 
-async function saveSchema() {
-  schemaData.title = document.getElementById("schema-title").value;
-  schemaData.description = document.getElementById("schema-desc").value;
-  const msg = document.getElementById("schema-msg");
-  msg.textContent = "儲存中…";
+async function saveSchema(lang) {
+  schemaData[lang].title = document.getElementById(`schema-title-${lang}`).value;
+  schemaData[lang].description = document.getElementById(`schema-desc-${lang}`).value;
+  const msg = document.getElementById(`schema-msg-${lang}`);
+  msg.textContent = lang === "en" ? "Saving…" : "儲存中…";
   try {
-    const res = await fetch(`${API_BASE}/api/admin/schema`, {
-      method: "POST", headers: authHeaders(), body: JSON.stringify(schemaData),
+    const res = await fetch(`${API_BASE}/api/admin/schema?lang=${lang}`, {
+      method: "POST", headers: authHeaders(), body: JSON.stringify(schemaData[lang]),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "儲存失敗");
-    msg.textContent = "已儲存 ✓";
+    if (!res.ok) throw new Error(data.error || (lang === "en" ? "Save failed" : "儲存失敗"));
+    msg.textContent = lang === "en" ? "Saved ✓" : "已儲存 ✓";
     setTimeout(() => (msg.textContent = ""), 2000);
   } catch (err) {
     msg.textContent = err.message;
