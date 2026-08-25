@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BY7125SWL QSL Exchange Service</title>
+<style>
+  :root{
+    --bg:#f4f1ea;
+    --panel:#ffffff;
+    --accent:#0d5c63;
+    --accent-dark:#083f44;
+    --text:#2b2b2b;
+    --muted:#6b6b6b;
+    --border:#e2ddd0;
+    --warn-bg:#fff6e0;
+    --warn-border:#e8c874;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Noto Sans TC","Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.75;
+  }
+  .wrap{
+    max-width:1000px;
+    margin:0 auto;
+    padding:20px 20px 60px;
+  }
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 0;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .home-btn{
+    display:inline-block;
+    padding:8px 16px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--accent-dark);
+    text-decoration:none;
+    font-size:14px;
+    transition:background .2s;
+  }
+  .home-btn:hover{ background:#eef4f3; }
+  .lang-switch{
+    display:flex;
+    gap:6px;
+    font-size:14px;
+  }
+  .lang-switch button{
+    padding:6px 14px;
+    border:1px solid var(--accent);
+    background:transparent;
+    color:var(--accent-dark);
+    border-radius:6px;
+    cursor:pointer;
+    font-size:14px;
+  }
+  .lang-switch button.active{
+    background:var(--accent);
+    color:#fff;
+  }
+  header.hero{
+    text-align:center;
+    padding:36px 20px 30px;
+    background:linear-gradient(180deg,#0d5c63 0%,#0a474d 100%);
+    color:#fff;
+    border-radius:14px;
+    margin-bottom:30px;
+  }
+  header.hero h1{
+    margin:0 0 8px;
+    font-size:1.7rem;
+    letter-spacing:.5px;
+  }
+  header.hero p{
+    margin:0;
+    color:#dfeeec;
+    font-size:1rem;
+  }
+  .callsign-tag{
+    display:inline-block;
+    margin-top:14px;
+    padding:4px 14px;
+    border:1px solid rgba(255,255,255,.5);
+    border-radius:20px;
+    font-size:.8rem;
+    letter-spacing:1px;
+  }
+  section{
+    margin-bottom:44px;
+  }
+  h2.section-title{
+    font-size:1.35rem;
+    color:var(--accent-dark);
+    border-left:5px solid var(--accent);
+    padding-left:12px;
+    margin-bottom:20px;
+  }
+  h3.sub-title{
+    font-size:1.05rem;
+    color:var(--accent-dark);
+    margin:22px 0 10px;
+  }
+  .faq-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:18px 20px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);
+  }
+  .faq-q{
+    font-weight:700;
+    color:var(--accent-dark);
+    margin-bottom:6px;
+    display:flex;
+    gap:8px;
+  }
+  .faq-q .q-mark{
+    color:var(--accent);
+  }
+  .faq-a{
+    color:var(--text);
+    margin:0;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:22px 24px;
+  }
+  ul{
+    padding-left:1.3em;
+    margin:10px 0;
+  }
+  li{ margin-bottom:6px; }
+  .note{
+    background:var(--warn-bg);
+    border:1px solid var(--warn-border);
+    border-radius:8px;
+    padding:14px 18px;
+    margin:16px 0;
+    font-size:.95rem;
+  }
+  .note strong{ color:#8a6d1a; }
+  .privacy-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:18px;
+  }
+  .privacy-block{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:18px 20px;
+  }
+  .privacy-block h4{
+    margin:0 0 10px;
+    color:var(--accent-dark);
+    font-size:1rem;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .privacy-block h4::before{
+    content:"";
+    width:8px;
+    height:8px;
+    background:var(--accent);
+    border-radius:50%;
+    display:inline-block;
+  }
+  footer{
+    text-align:center;
+    padding:26px 10px;
+    color:var(--muted);
+    font-size:.85rem;
+    border-top:1px solid var(--border);
+    margin-top:20px;
+  }
+  small.legal{
+    display:block;
+    margin-top:16px;
+    color:var(--muted);
+    font-size:.82rem;
+  }
+  @media (min-width:700px){
+    .privacy-grid{
+      grid-template-columns:1fr 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a href="/" class="home-btn" data-key="home_btn">← 返回主頁</a>
+    <div class="lang-switch">
+      <button id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+      <span style="color:var(--muted)">|</span>
+      <button id="btn-en" onclick="setLang('en')">English</button>
+    </div>
+  </div>
+
+  <header class="hero">
+    <h1 data-key="title">BY7125SWL QSL Exchange Service</h1>
+    <p data-key="subtitle">QSL 申請須知與個人資訊保護聲明</p>
+    <span class="callsign-tag">SWL · HAM · Shortwave Listening</span>
+  </header>
+
+  <!-- FAQ -->
+  <section>
+    <h2 class="section-title" data-key="faq_title">常見問題 FAQ</h2>
+
+    <div class="faq-card">
+      <div class="faq-q"><span class="q-mark">Q.</span><span data-key="faq_q1">任何人都可以申請 QSL 卡片嗎？</span></div>
+      <p class="faq-a" data-key="faq_a1">歡迎短波愛好者、SWL/HAM 同好以及 BY7125SWL YouTube 頻道觀眾申請。本站會依申請內容及交流情況安排 QSL 回覆。</p>
+    </div>
+
+    <div class="faq-card">
+      <div class="faq-q"><span class="q-mark">Q.</span><span data-key="faq_q2">提交申請後一定會收到紙質 QSL 卡嗎？</span></div>
+      <p class="faq-a" data-key="faq_a2">不一定。紙質 QSL 卡片數量有限，將依收聽報告完整程度、交流情況、申請數量及物料狀況安排。若無法提供紙卡，可能提供電子 QSL 作為紀念。</p>
+    </div>
+
+    <div class="faq-card">
+      <div class="faq-q"><span class="q-mark">Q.</span><span data-key="faq_q3">申請需要提供哪些資料？</span></div>
+      <p class="faq-a" data-key="faq_a3">通常需要 Email、稱呼／呼號（如適用）、郵寄地址（如申請紙質 QSL），以及相關收聽或觀看交流資訊。</p>
+    </div>
+
+    <div class="faq-card">
+      <div class="faq-q"><span class="q-mark">Q.</span><span data-key="faq_q4">我的地址會被公開嗎？</span></div>
+      <p class="faq-a" data-key="faq_a4">不會。郵寄地址僅用於 QSL 卡片寄送及必要郵務聯絡，不會出售、公開或用於其他用途。</p>
+    </div>
+
+    <div class="faq-card">
+      <div class="faq-q"><span class="q-mark">Q.</span><span data-key="faq_q5">收到 QSL 卡需要多久？</span></div>
+      <p class="faq-a" data-key="faq_a5">取決於申請處理、郵政運輸及跨境寄送情況。本站會盡力處理，但無法保證固定時間或必然送達。</p>
+    </div>
+
+    <div class="faq-card">
+      <div class="faq-q"><span class="q-mark">Q.</span><span data-key="faq_q6">沒有短波收聽報告，可以申請嗎？</span></div>
+      <p class="faq-a" data-key="faq_a6">可以。YouTube 頻道觀眾可申請紀念 QSL；若能分享觀看心得、留言交流或其他回饋，將有助於本站了解交流背景。</p>
+    </div>
+  </section>
+
+  <!-- Rules -->
+  <section>
+    <h2 class="section-title" data-key="rules_title">申請規則</h2>
+    <div class="panel">
+      <p data-key="rules_p1">歡迎所有短波愛好者、SWL/HAM 同好以及 YouTube 頻道觀眾參與交流。根據申請情況，我們可能提供：</p>
+      <ul>
+        <li data-key="rules_l1">實體紙質 QSL 卡片</li>
+        <li data-key="rules_l2">電子 QSL（eQSL）</li>
+      </ul>
+
+      <p data-key="rules_p2">SWL/HAM 同好進行正式 QSL 交流、提交收聽報告，或分享詳細收聽／觀看體驗者，將優先安排實體紙質 QSL 卡片。</p>
+      <p data-key="rules_p3">YouTube 頻道觀眾亦歡迎申請紀念 QSL；如能提供觀看心得、留言交流或對本站內容之回饋，將有助於本站了解交流背景並安排申請。</p>
+
+      <div class="note">
+        <strong data-key="note1_strong">請注意：</strong>
+        <span data-key="note1_text">本站將盡力處理符合要求之申請，但保留因資料不足、無法確認、卡片或相關物料不足或其他合理原因拒絕或暫緩處理申請之權利。</span>
+      </div>
+
+      <p data-key="rules_p4">紙質 QSL 卡片將依照申請數量、交流情況及可提供數量進行安排；如無法提供紙質卡片，將提供電子 QSL 作為紀念。</p>
+
+      <div class="note">
+        <strong data-key="note2_strong">郵寄說明：</strong>
+        <span data-key="note2_text">紙質 QSL 卡片寄送依賴郵政服務，由於經費不足，本站無法以掛號信形式寄出 QSL 卡片，因此無法保證郵寄時間或必然送達，但將盡力協助處理相關問題。</span>
+      </div>
+
+      <h3 class="sub-title" data-key="rules_h3_1">通訊地址填寫方式</h3>
+      <p data-key="rules_p5">非中國大陸、香港、澳門、臺灣的通訊地址請使用英文填寫，中國大陸、香港、澳門、臺灣的通訊地址可使用中文/英文填寫。</p>
+
+      <h3 class="sub-title" data-key="rules_h3_2">申請確認</h3>
+      <p data-key="rules_p6">提交申請後，我們可能會通過 Email 與您確認 QSL 方式及補充必要資訊。</p>
+
+      <h3 class="sub-title" data-key="rules_h3_3">服務範圍</h3>
+      <p data-key="rules_p7">本服務主要用於業餘無線電、短波收聽及頻道交流用途。大量重複申請、惡意提交虛假資料、提交無意義內容、或無關之申請，本站保留不予處理或拒絕之權利。</p>
+
+      <p data-key="rules_thanks" style="margin-top:20px;color:var(--muted);">感謝您對 BY7125SWL 的支持與關注。</p>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section>
+    <h2 class="section-title" data-key="privacy_title">個人私隱保護聲明</h2>
+    <div class="panel">
+      <p data-key="privacy_intro">本網站蒐集之個人資料僅用於處理 QSL 卡片申請、寄送卡片、回覆聯絡，以及相關服務管理用途。</p>
+
+      <div class="privacy-grid">
+        <div class="privacy-block">
+          <h4 data-key="privacy_h_collect">收集資訊</h4>
+          <ul>
+            <li data-key="privacy_c1">姓名/呼號/SWL ID/暱稱（如適用）</li>
+            <li data-key="privacy_c2">郵寄地址</li>
+            <li data-key="privacy_c3">電子郵件地址</li>
+            <li data-key="privacy_c4">我方發出的收聽資訊（頻率、時間、設備、接收地點等）</li>
+            <li data-key="privacy_c5">其他申請人主動提供之資訊</li>
+          </ul>
+        </div>
+
+        <div class="privacy-block">
+          <h4 data-key="privacy_h_retain">保存期限</h4>
+          <p style="margin:0 0 8px;"><strong data-key="privacy_r_long_title">長期（交流紀錄）</strong> <span data-key="privacy_r_long_note">（必要時將匿名化處理）：</span></p>
+          <ul>
+            <li data-key="privacy_r1">呼號/SWL ID</li>
+            <li data-key="privacy_r2">希望與我們交換 QSL 卡片的方式</li>
+            <li data-key="privacy_r3">希望的回卡方式</li>
+            <li data-key="privacy_r4">本頻道公開發佈的收聽內容（如 YouTube 影片內容）</li>
+            <li data-key="privacy_r5">頻道觀看感想</li>
+            <li data-key="privacy_r6">觀看的影片連結</li>
+            <li data-key="privacy_r7">如何了解到 BY7125SWL</li>
+          </ul>
+          <p style="margin:14px 0 8px;"><strong data-key="privacy_r_short_title">保留 180 天</strong> <span data-key="privacy_r_short_note">（以信件寄出之日開始計算）：</span></p>
+          <ul>
+            <li data-key="privacy_s1">姓名/暱稱</li>
+            <li data-key="privacy_s2">聯絡 Email</li>
+            <li data-key="privacy_s3">通訊地址</li>
+          </ul>
+        </div>
+
+        <div class="privacy-block">
+          <h4 data-key="privacy_h_use">資訊使用方式</h4>
+          <p data-key="privacy_use1">本網站不會出售、出租或公開販售申請人個人資料。通訊地址僅用於寄送 QSL 卡片及必要郵寄聯絡，不會用於其他用途。</p>
+          <p data-key="privacy_use2">除法律要求或為完成郵寄服務所必要之情況外，不會提供予第三方。</p>
+        </div>
+
+        <div class="privacy-block">
+          <h4 data-key="privacy_h_rights">使用者權利</h4>
+          <p data-key="privacy_rights1">申請人可透過網站聯絡方式要求查詢、更正或刪除其個人資料（法律另有規定或基於紀錄保存需求者除外）。</p>
+          <p data-key="privacy_rights2">申請人可透過本站聯繫方式要求刪除不在個人資料保存期限標注爲長期的內容，如果要求，我方將於 QSL 交流完成且無後續處理需求後刪除，原則上不晚於 QSL 卡片交流完成後 24 小時。如因郵寄追蹤、退件處理、補寄或其他必要交流需求，將保留至相關事項完成。</p>
+        </div>
+      </div>
+
+      <small class="legal" data-key="legal1">＊繼續提交申請即表明您已詳細閱讀且同意以上條款。</small>
+      <small class="legal" data-key="legal2">＊＊本頁所稱「本站」指 BY7125SWL QSL 交換服務。</small>
+    </div>
+  </section>
+
+  <footer>
+    <span data-key="footer">© BY7125SWL QSL Exchange Service</span>
+  </footer>
+
+</div>
+
+<script>
+const translations = {
+  zh: {
+    home_btn: "← 返回主頁",
+    title: "BY7125SWL QSL Exchange Service",
+    subtitle: "QSL 申請須知與個人資訊保護聲明",
+    faq_title: "常見問題 FAQ",
+    faq_q1: "任何人都可以申請 QSL 卡片嗎？",
+    faq_a1: "歡迎短波愛好者、SWL/HAM 同好以及 BY7125SWL YouTube 頻道觀眾申請。本站會依申請內容及交流情況安排 QSL 回覆。",
+    faq_q2: "提交申請後一定會收到紙質 QSL 卡嗎？",
+    faq_a2: "不一定。紙質 QSL 卡片數量有限，將依收聽報告完整程度、交流情況、申請數量及物料狀況安排。若無法提供紙卡，可能提供電子 QSL 作為紀念。",
+    faq_q3: "申請需要提供哪些資料？",
+    faq_a3: "通常需要 Email、稱呼／呼號（如適用）、郵寄地址（如申請紙質 QSL），以及相關收聽或觀看交流資訊。",
+    faq_q4: "我的地址會被公開嗎？",
+    faq_a4: "不會。郵寄地址僅用於 QSL 卡片寄送及必要郵務聯絡，不會出售、公開或用於其他用途。",
+    faq_q5: "收到 QSL 卡需要多久？",
+    faq_a5: "取決於申請處理、郵政運輸及跨境寄送情況。本站會盡力處理，但無法保證固定時間或必然送達。",
+    faq_q6: "沒有短波收聽報告，可以申請嗎？",
+    faq_a6: "可以。YouTube 頻道觀眾可申請紀念 QSL；若能分享觀看心得、留言交流或其他回饋，將有助於本站了解交流背景。",
+    rules_title: "申請規則",
+    rules_p1: "歡迎所有短波愛好者、SWL/HAM 同好以及 YouTube 頻道觀眾參與交流。根據申請情況，我們可能提供：",
+    rules_l1: "實體紙質 QSL 卡片",
+    rules_l2: "電子 QSL（eQSL）",
+    rules_p2: "SWL/HAM 同好進行正式 QSL 交流、提交收聽報告，或分享詳細收聽／觀看體驗者，將優先安排實體紙質 QSL 卡片。",
+    rules_p3: "YouTube 頻道觀眾亦歡迎申請紀念 QSL；如能提供觀看心得、留言交流或對本站內容之回饋，將有助於本站了解交流背景並安排申請。",
+    note1_strong: "請注意：",
+    note1_text: "本站將盡力處理符合要求之申請，但保留因資料不足、無法確認、卡片或相關物料不足或其他合理原因拒絕或暫緩處理申請之權利。",
+    rules_p4: "紙質 QSL 卡片將依照申請數量、交流情況及可提供數量進行安排；如無法提供紙質卡片，將提供電子 QSL 作為紀念。",
+    note2_strong: "郵寄說明：",
+    note2_text: "紙質 QSL 卡片寄送依賴郵政服務，由於經費不足，本站無法以掛號信形式寄出 QSL 卡片，因此無法保證郵寄時間或必然送達，但將盡力協助處理相關問題。",
+    rules_h3_1: "通訊地址填寫方式",
+    rules_p5: "非中國大陸、香港、澳門、臺灣的通訊地址請使用英文填寫，中國大陸、香港、澳門、臺灣的通訊地址可使用中文/英文填寫。",
+    rules_h3_2: "申請確認",
+    rules_p6: "提交申請後，我們可能會通過 Email 與您確認 QSL 方式及補充必要資訊。",
+    rules_h3_3: "服務範圍",
+    rules_p7: "本服務主要用於業餘無線電、短波收聽及頻道交流用途。大量重複申請、惡意提交虛假資料、提交無意義內容、或無關之申請，本站保留不予處理或拒絕之權利。",
+    rules_thanks: "感謝您對 BY7125SWL 的支持與關注。",
+    privacy_title: "個人私隱保護聲明",
+    privacy_intro: "本網站蒐集之個人資料僅用於處理 QSL 卡片申請、寄送卡片、回覆聯絡，以及相關服務管理用途。",
+    privacy_h_collect: "收集資訊",
+    privacy_c1: "姓名/呼號/SWL ID/暱稱（如適用）",
+    privacy_c2: "郵寄地址",
+    privacy_c3: "電子郵件地址",
+    privacy_c4: "我方發出的收聽資訊（頻率、時間、設備、接收地點等）",
+    privacy_c5: "其他申請人主動提供之資訊",
+    privacy_h_retain: "保存期限",
+    privacy_r_long_title: "長期（交流紀錄）",
+    privacy_r_long_note: "（必要時將匿名化處理）：",
+    privacy_r1: "呼號/SWL ID",
+    privacy_r2: "希望與我們交換 QSL 卡片的方式",
+    privacy_r3: "希望的回卡方式",
+    privacy_r4: "本頻道公開發佈的收聽內容（如 YouTube 影片內容）",
+    privacy_r5: "頻道觀看感想",
+    privacy_r6: "觀看的影片連結",
+    privacy_r7: "如何了解到 BY7125SWL",
+    privacy_r_short_title: "保留 180 天",
+    privacy_r_short_note: "（以信件寄出之日開始計算）：",
+    privacy_s1: "姓名/暱稱",
+    privacy_s2: "聯絡 Email",
+    privacy_s3: "通訊地址",
+    privacy_h_use: "資訊使用方式",
+    privacy_use1: "本網站不會出售、出租或公開販售申請人個人資料。通訊地址僅用於寄送 QSL 卡片及必要郵寄聯絡，不會用於其他用途。",
+    privacy_use2: "除法律要求或為完成郵寄服務所必要之情況外，不會提供予第三方。",
+    privacy_h_rights: "使用者權利",
+    privacy_rights1: "申請人可透過網站聯絡方式要求查詢、更正或刪除其個人資料（法律另有規定或基於紀錄保存需求者除外）。",
+    privacy_rights2: "申請人可透過本站聯繫方式要求刪除不在個人資料保存期限標注爲長期的內容，如果要求，我方將於 QSL 交流完成且無後續處理需求後刪除，原則上不晚於 QSL 卡片交流完成後 24 小時。如因郵寄追蹤、退件處理、補寄或其他必要交流需求，將保留至相關事項完成。",
+    legal1: "＊繼續提交申請即表明您已詳細閱讀且同意以上條款。",
+    legal2: "＊＊本頁所稱「本站」指 BY7125SWL QSL 交換服務。",
+    footer: "© BY7125SWL QSL Exchange Service"
+  },
+  en: {
+    home_btn: "← Back to Home",
+    title: "BY7125SWL QSL Exchange Service",
+    subtitle: "QSL Application Guidelines & Privacy Policy",
+    faq_title: "Frequently Asked Questions",
+    faq_q1: "Can anyone apply for a QSL card?",
+    faq_a1: "Shortwave listeners, SWL/HAM friends, and viewers of the BY7125SWL YouTube channel are all welcome to apply. QSL replies are arranged based on the content of each application and the nature of the exchange.",
+    faq_q2: "Is a paper QSL card guaranteed after submitting an application?",
+    faq_a2: "Not necessarily. Paper QSL cards are limited in supply and are allocated based on the completeness of the reception report, the nature of the exchange, the volume of applications, and available materials. If a paper card cannot be provided, an electronic QSL (eQSL) may be issued as a keepsake instead.",
+    faq_q3: "What information is required to apply?",
+    faq_a3: "Generally required: an email address, a name or callsign (if applicable), a mailing address (if requesting a paper QSL), and relevant listening or viewing details.",
+    faq_q4: "Will my address be made public?",
+    faq_a4: "No. Mailing addresses are used solely for sending QSL cards and necessary postal correspondence, and will not be sold, disclosed, or used for any other purpose.",
+    faq_q5: "How long does it take to receive a QSL card?",
+    faq_a5: "This depends on application processing, postal transit, and cross-border delivery conditions. We make every reasonable effort to process requests promptly, but cannot guarantee a fixed timeframe or delivery.",
+    faq_q6: "Can I apply without a shortwave reception report?",
+    faq_a6: "Yes. YouTube channel viewers may apply for a commemorative QSL. Sharing your viewing impressions, comments, or other feedback helps us better understand the context of the exchange.",
+    rules_title: "Application Rules",
+    rules_p1: "All shortwave enthusiasts, SWL/HAM friends, and YouTube channel viewers are welcome to take part. Depending on the nature of the application, we may provide:",
+    rules_l1: "A physical paper QSL card",
+    rules_l2: "An electronic QSL (eQSL)",
+    rules_p2: "SWL/HAM listeners who engage in formal QSL exchanges, submit reception reports, or share detailed listening or viewing experiences will be given priority for physical paper QSL cards.",
+    rules_p3: "YouTube channel viewers are also welcome to apply for a commemorative QSL. Providing viewing impressions, comments, or feedback on our content helps us understand the context of the exchange and process the application accordingly.",
+    note1_strong: "Please note:",
+    note1_text: "We will make every reasonable effort to process qualifying applications, but reserve the right to decline or defer processing due to insufficient information, inability to verify details, shortage of cards or materials, or other reasonable causes.",
+    rules_p4: "Paper QSL cards are allocated according to the number of applications, the nature of the exchange, and available supply. If a paper card cannot be provided, an electronic QSL will be issued as a keepsake.",
+    note2_strong: "Regarding postal delivery:",
+    note2_text: "Delivery of paper QSL cards relies on postal services. Due to limited funding, we are unable to send QSL cards by registered mail, and therefore cannot guarantee delivery time or successful delivery. We will, however, do our best to assist with any related issues.",
+    rules_h3_1: "Mailing Address Format",
+    rules_p5: "Addresses outside mainland China, Hong Kong, Macau, and Taiwan should be provided in English. Addresses within mainland China, Hong Kong, Macau, and Taiwan may be provided in Chinese or English.",
+    rules_h3_2: "Application Confirmation",
+    rules_p6: "After an application is submitted, we may contact you by email to confirm the QSL method and request any additional information needed.",
+    rules_h3_3: "Scope of Service",
+    rules_p7: "This service is intended primarily for amateur radio, shortwave listening, and channel-related exchanges. We reserve the right to decline or disregard applications involving excessive repeat submissions, deliberately false information, meaningless content, or requests unrelated to this service.",
+    rules_thanks: "Thank you for your support of and interest in BY7125SWL.",
+    privacy_title: "Privacy Policy",
+    privacy_intro: "Personal data collected through this website is used solely for processing QSL card applications, sending cards, responding to correspondence, and related service administration.",
+    privacy_h_collect: "Information We Collect",
+    privacy_c1: "Name / callsign / SWL ID / nickname (as applicable)",
+    privacy_c2: "Mailing address",
+    privacy_c3: "Email address",
+    privacy_c4: "Reception details we issue (frequency, time, equipment, reception location, etc.)",
+    privacy_c5: "Other information voluntarily provided by the applicant",
+    privacy_h_retain: "Retention Period",
+    privacy_r_long_title: "Long-term (exchange records)",
+    privacy_r_long_note: "(anonymized where necessary):",
+    privacy_r1: "Callsign / SWL ID",
+    privacy_r2: "Preferred method of QSL exchange with us",
+    privacy_r3: "Preferred method for receiving a reply card",
+    privacy_r4: "Listening content publicly published on our channel (e.g. YouTube video content)",
+    privacy_r5: "Comments or impressions about the channel",
+    privacy_r6: "Links to videos viewed",
+    privacy_r7: "How you learned about BY7125SWL",
+    privacy_r_short_title: "Retained for 180 days",
+    privacy_r_short_note: "(calculated from the date the letter is sent):",
+    privacy_s1: "Name / nickname",
+    privacy_s2: "Contact email",
+    privacy_s3: "Mailing address",
+    privacy_h_use: "How Information Is Used",
+    privacy_use1: "This website does not sell, rent, or publicly disclose applicants' personal data. Mailing addresses are used only for sending QSL cards and necessary postal correspondence, and for no other purpose.",
+    privacy_use2: "Information will not be shared with third parties except where required by law or necessary to complete postal delivery.",
+    privacy_h_rights: "Your Rights",
+    privacy_rights1: "Applicants may contact us through the website to request access to, correction of, or deletion of their personal data (except where otherwise required by law or necessary for record-keeping).",
+    privacy_rights2: "Applicants may request deletion of information not designated as long-term retention through our contact channels. Upon request, such data will be deleted once the QSL exchange is complete and no further processing is required — in principle, no later than 24 hours after the exchange is finalized. Where mail tracking, returned mail handling, re-sending, or other necessary correspondence is involved, the data will be retained until those matters are resolved.",
+    legal1: "* By continuing to submit an application, you confirm that you have read and agree to the terms above.",
+    legal2: "** \"This site\" as referred to on this page means the BY7125SWL QSL Exchange Service.",
+    footer: "© BY7125SWL QSL Exchange Service"
+  }
+};
+
+function setLang(lang){
+  document.querySelectorAll('[data-key]').forEach(el=>{
+    const key = el.getAttribute('data-key');
+    if(translations[lang][key] !== undefined){
+      el.textContent = translations[lang][key];
+    }
+  });
+  document.getElementById('btn-zh').classList.toggle('active', lang==='zh');
+  document.getElementById('btn-en').classList.toggle('active', lang==='en');
+  document.documentElement.lang = lang==='zh' ? 'zh-Hant' : 'en';
+  localStorage_safe(lang);
+}
+
+function localStorage_safe(lang){
+  try{ /* no-op: artifacts environment restrictions avoided intentionally */ }catch(e){}
+}
+
+setLang('zh');
+</script>
+</body>
+</html>
